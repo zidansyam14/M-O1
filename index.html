@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keyboard Research Lab</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1020;
+    --panel: #121a2f;
+    --panel2: #18233d;
+    --text: #eef3ff;
+    --muted: #9ca9c7;
+    --accent: #8b7cff;
+    --good: #54d68a;
+    --danger: #ff6b7a;
+    --border: #293653;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top, #18264a, var(--bg) 55%);
+    color: var(--text);
+  }
+  main { width: min(1100px, 94vw); margin: 0 auto; padding: 36px 0 60px; }
+  h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.4rem); }
+  h2 { margin-top: 0; }
+  p { line-height: 1.6; }
+  .muted { color: var(--muted); }
+  .card {
+    background: color-mix(in srgb, var(--panel) 94%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px;
+    margin-top: 18px;
+    box-shadow: 0 16px 50px #0005;
+  }
+  .notice {
+    border-left: 4px solid var(--accent);
+    background: #151d35;
+    padding: 14px 16px;
+    border-radius: 10px;
+  }
+  button {
+    border: 0;
+    border-radius: 11px;
+    padding: 11px 16px;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--accent);
+    color: white;
+  }
+  button.secondary { background: var(--panel2); border: 1px solid var(--border); }
+  button.danger { background: #612534; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    background: #202a43;
+    font-weight: 700;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #77839e; }
+  .recording .dot { background: var(--good); box-shadow: 0 0 14px var(--good); }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 12px;
+  }
+  .stat {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 14px;
+  }
+  .stat strong { display: block; font-size: 1.5rem; margin-top: 4px; }
+  .keyboard-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .keyboard { min-width: 820px; }
+  .key-row { display: flex; gap: 7px; margin: 7px 0; }
+  .key {
+    height: 48px;
+    min-width: 48px;
+    padding: 0 9px;
+    border: 1px solid #34425f;
+    border-radius: 8px;
+    background: #1b2742;
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    user-select: none;
+    transition: transform .04s, background .04s, box-shadow .04s;
+  }
+  .key.wide { min-width: 74px; }
+  .key.xwide { min-width: 105px; }
+  .key.space { min-width: 300px; margin: 0 auto; }
+  .key.active {
+    background: #6657c9;
+    transform: translateY(2px);
+    box-shadow: 0 0 18px #8b7cff88;
+  }
+  .key.unknown { outline: 2px solid #f1bd5b; }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #080c17;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    max-height: 280px;
+    overflow: auto;
+  }
+  footer { margin-top: 20px; color: var(--muted); font-size: .9rem; }
+  label { display: block; margin-bottom: 8px; font-weight: 700; }
+  input[type="text"] {
+    width: min(420px, 100%);
+    background: #0b1122;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Not recording</span></div>
+    <h1>⌨️ Keyboard Research Lab</h1>
+    <p class="muted">
+      A consent-based browser experiment for studying keyboard timing and physical key usage.
+      This version stores <strong>key codes and timing only</strong>, never the characters you type.
+    </p>
+  </header>
+
+  <section class="card" id="consentCard">
+    <h2>Before you start</h2>
+    <div class="notice">
+      Recording begins only after you press <strong>Start experiment</strong>.
+      While recording, this page observes keyboard events received by this webpage.
+      Do not enter passwords, private messages, or other sensitive information.
+      Data stays in this browser until you export it.
+    </div>
+    <p>
+      <strong>Research ID:</strong> an anonymous label is generated locally and can be changed.
+    </p>
+    <input id="participantId" type="text" maxlength="40" aria-label="Research ID">
+    <div class="row" style="margin-top:14px">
+      <button id="startBtn">Start experiment</button>
+      <button class="secondary" id="resetBtn">Reset data</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Live measurements</h2>
+      <span class="muted" id="focusHint">Click this page before typing.</span>
+    </div>
+    <div class="stats" style="margin-top:15px">
+      <div class="stat">Events<strong id="events">0</strong></div>
+      <div class="stat">Key presses<strong id="presses">0</strong></div>
+      <div class="stat">Unique keys<strong id="unique">0</strong></div>
+      <div class="stat">Avg. interval<strong id="interval">0 ms</strong></div>
+      <div class="stat">Avg. hold<strong id="hold">0 ms</strong></div>
+      <div class="stat">Duration<strong id="duration">0.0 s</strong></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Physical keyboard view</h2>
+    <p class="muted">The highlighted key is the physical key reported by <code>KeyboardEvent.code</code>.</p>
+    <div class="keyboard-wrap">
+      <div class="keyboard" id="keyboard"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Export</h2>
+    <p class="muted">
+      Export creates a JSON file containing research telemetry. Actual typed characters are deliberately excluded.
+    </p>
+    <div class="row">
+      <button id="exportBtn" disabled>Export JSON</button>
+      <button class="secondary" id="copyBtn" disabled>Copy summary</button>
+      <button class="danger" id="stopBtn" disabled>Stop experiment</button>
+    </div>
+    <pre id="summary">No experiment data yet.</pre>
+  </section>
+
+  <footer>
+    Keyboard Research Lab • local-only prototype • GitHub Pages compatible
+  </footer>
+</main>
+
+<script>
+(() => {
+  const state = {
+    recording: false,
+    startedAt: null,
+    stoppedAt: null,
+    events: [],
+    presses: 0,
+    downs: new Map(),
+    intervals: [],
+    holds: [],
+    unique: new Set(),
+    lastDown: null,
+    participantId: ""
+  };
+
+  const $ = id => document.getElementById(id);
+  const status = $("status");
+  const statusText = $("statusText");
+  const participantInput = $("participantId");
+
+  participantInput.value =
+    localStorage.getItem("keyboardResearchId") ||
+    "participant-" + crypto.randomUUID().slice(0, 8);
+
+  const rows = [
+    [["Escape","Esc"],["F1","F1"],["F2","F2"],["F3","F3"],["F4","F4"],["F5","F5"],["F6","F6"],["F7","F7"],["F8","F8"],["F9","F9"],["F10","F10"],["F11","F11"],["F12","F12"]],
+    [["Backquote","`"],["Digit1","1"],["Digit2","2"],["Digit3","3"],["Digit4","4"],["Digit5","5"],["Digit6","6"],["Digit7","7"],["Digit8","8"],["Digit9","9"],["Digit0","0"],["Minus","-"],["Equal","="],["Backspace","Backspace"]],
+    [["Tab","Tab"],["KeyQ","Q"],["KeyW","W"],["KeyE","E"],["KeyR","R"],["KeyT","T"],["KeyY","Y"],["KeyU","U"],["KeyI","I"],["KeyO","O"],["KeyP","P"],["BracketLeft","["],["BracketRight","]"],["Backslash","\\"]],
+    [["CapsLock","Caps"],["KeyA","A"],["KeyS","S"],["KeyD","D"],["KeyF","F"],["KeyG","G"],["KeyH","H"],["KeyJ","J"],["KeyK","K"],["KeyL","L"],["Semicolon",";"],["Quote","'"],["Enter","Enter"]],
+    [["ShiftLeft","Shift"],["KeyZ","Z"],["KeyX","X"],["KeyC","C"],["KeyV","V"],["KeyB","B"],["KeyN","N"],["KeyM","M"],["Comma",","],["Period","."],["Slash","/"],["ShiftRight","Shift"]],
+    [["ControlLeft","Ctrl"],["MetaLeft","Meta"],["AltLeft","Alt"],["Space","Space"],["AltRight","Alt"],["MetaRight","Meta"],["ContextMenu","Menu"],["ControlRight","Ctrl"]]
+  ];
+
+  function buildKeyboard() {
+    const root = $("keyboard");
+    rows.forEach(row => {
+      const line = document.createElement("div");
+      line.className = "key-row";
+      row.forEach(([code, label]) => {
+        const key = document.createElement("div");
+        key.className = "key";
+        if (["Backspace","Enter","ShiftLeft","ShiftRight"].includes(code)) key.classList.add("wide");
+        if (code === "Space") key.classList.add("space");
+        key.dataset.code = code;
+        key.textContent = label;
+        line.appendChild(key);
+      });
+      root.appendChild(line);
+    });
+  }
+
+  function setActive(code, active) {
+    const key = document.querySelector(`[data-code="${CSS.escape(code)}"]`);
+    if (key) key.classList.toggle("active", active);
+  }
+
+  function ensureUnknown(code) {
+    if (document.querySelector(`[data-code="${CSS.escape(code)}"]`)) return;
+    const key = document.createElement("div");
+    key.className = "key unknown";
+    key.dataset.code = code;
+    key.textContent = code;
+    $("keyboard").appendChild(key);
+  }
+
+  function average(values) {
+    return values.length ? values.reduce((a,b) => a+b, 0) / values.length : 0;
+  }
+
+  function updateUI() {
+    $("events").textContent = state.events.length;
+    $("presses").textContent = state.presses;
+    $("unique").textContent = state.unique.size;
+    $("interval").textContent = Math.round(average(state.intervals)) + " ms";
+    $("hold").textContent = Math.round(average(state.holds)) + " ms";
+
+    const end = state.stoppedAt || (state.recording ? performance.now() : state.startedAt);
+    const seconds = state.startedAt && end ? Math.max(0, (end - state.startedAt) / 1000) : 0;
+    $("duration").textContent = seconds.toFixed(1) + " s";
+
+    $("exportBtn").disabled = state.events.length === 0;
+    $("copyBtn").disabled = state.events.length === 0;
+    $("stopBtn").disabled = !state.recording;
+
+    $("summary").textContent = JSON.stringify({
+      participantId: state.participantId,
+      eventCount: state.events.length,
+      keyPresses: state.presses,
+      uniquePhysicalKeys: state.unique.size,
+      averageIntervalMs: Math.round(average(state.intervals)),
+      averageHoldMs: Math.round(average(state.holds)),
+      durationSeconds: Number(seconds.toFixed(2))
+    }, null, 2);
+  }
+
+  function start() {
+    if (state.recording) return;
+    state.participantId = participantInput.value.trim() || "anonymous";
+    localStorage.setItem("keyboardResearchId", state.participantId);
+    state.recording = true;
+    state.startedAt = performance.now();
+    state.stoppedAt = null;
+    state.events = [];
+    state.presses = 0;
+    state.downs.clear();
+    state.intervals = [];
+    state.holds = [];
+    state.unique.clear();
+    state.lastDown = null;
+
+    status.classList.add("recording");
+    statusText.textContent = "Recording";
+    $("focusHint").textContent = "Recording is active. Keep this page focused.";
+    $("startBtn").disabled = true;
+    participantInput.disabled = true;
+    updateUI();
+  }
+
+  function stop() {
+    if (!state.recording) return;
+    state.recording = false;
+    state.stoppedAt = performance.now();
+    for (const code of state.downs.keys()) setActive(code, false);
+    state.downs.clear();
+
+    status.classList.remove("recording");
+    statusText.textContent = "Not recording";
+    $("focusHint").textContent = "Experiment stopped.";
+    $("startBtn").disabled = false;
+    participantInput.disabled = false;
+    updateUI();
+  }
+
+  function reset() {
+    stop();
+    state.events = [];
+    state.presses = 0;
+    state.intervals = [];
+    state.holds = [];
+    state.unique.clear();
+    state.startedAt = null;
+    state.stoppedAt = null;
+    state.lastDown = null;
+    updateUI();
+  }
+
+  function onKeyDown(event) {
+    if (!state.recording || event.repeat) return;
+
+    const now = performance.now();
+    const code = event.code || "Unknown";
+
+    ensureUnknown(code);
+    setActive(code, true);
+
+    if (state.lastDown !== null) {
+      state.intervals.push(now - state.lastDown);
+    }
+    state.lastDown = now;
+
+    state.downs.set(code, now);
+    state.unique.add(code);
+    state.presses++;
+
+    // IMPORTANT: event.key is intentionally NOT stored.
+    state.events.push({
+      type: "keydown",
+      code,
+      t: Math.round(now - state.startedAt)
+    });
+
+    updateUI();
+  }
+
+  function onKeyUp(event) {
+    if (!state.recording) return;
+
+    const now = performance.now();
+    const code = event.code || "Unknown";
+    setActive(code, false);
+
+    const downAt = state.downs.get(code);
+    if (downAt !== undefined) {
+      state.holds.push(now - downAt);
+      state.downs.delete(code);
+    }
+
+    // IMPORTANT: event.key is intentionally NOT stored.
+    state.events.push({
+      type: "keyup",
+      code,
+      t: Math.round(now - state.startedAt)
+    });
+
+    updateUI();
+  }
+
+  function exportJSON() {
+    const data = {
+      schema: "keyboard-research-v1",
+      exportedAt: new Date().toISOString(),
+      participantId: state.participantId,
+      note: "Physical key codes and timing only. Typed characters are intentionally excluded.",
+      summary: {
+        eventCount: state.events.length,
+        keyPresses: state.presses,
+        uniquePhysicalKeys: state.unique.size,
+        averageIntervalMs: Math.round(average(state.intervals)),
+        averageHoldMs: Math.round(average(state.holds))
+      },
+      events: state.events
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `keyboard-research-${state.participantId}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copySummary() {
+    const text = $("summary").textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      $("copyBtn").textContent = "Copied!";
+      setTimeout(() => $("copyBtn").textContent = "Copy summary", 1200);
+    } catch {
+      alert("Clipboard access was unavailable. You can copy the summary manually.");
+    }
+  }
+
+  buildKeyboard();
+  $("startBtn").addEventListener("click", start);
+  $("stopBtn").addEventListener("click", stop);
+  $("resetBtn").addEventListener("click", reset);
+  $("exportBtn").addEventListener("click", exportJSON);
+  $("copyBtn").addEventListener("click", copySummary);
+
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", () => {
+    if (!state.recording) return;
+    for (const code of state.downs.keys()) setActive(code, false);
+  });
+
+  updateUI();
+})();
+</script>
+</body>
+</html>
