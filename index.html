@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Screen Recorder</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
+        video { width: 80%; max-width: 800px; background: black; border-radius: 8px; margin-bottom: 20px; border: 2px solid #ccc; }
+        button { padding: 12px 24px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; margin: 10px; color: white; font-weight: bold; }
+        #startBtn { background-color: #4CAF50; }
+        #startBtn:hover { background-color: #45a049; }
+        #stopBtn { background-color: #f44336; }
+        #stopBtn:hover { background-color: #da190b; }
+        #stopBtn:disabled { background-color: #cccccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <h2>Chromebook Screen Recorder</h2>
+    <p>Click "Start Recording" and select the screen, window, or tab you want to record.</p>
+
+    <video id="preview" autoplay muted></video><br>
+    
+    <button id="startBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const preview = document.getElementById('preview');
+
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                // This forces the browser to ask for permission!
+                stream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true, 
+                    audio: true // Will attempt to capture system audio if chosen
+                });
+
+                // Show the live preview on the page
+                preview.srcObject = stream;
+
+                // Prepare the recorder
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                
+                // Save the video data as it comes in
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                // What to do when the recording is stopped
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create an invisible link to trigger the download
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'my-screen-recording.webm'; // File name
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Clean everything up
+                    window.URL.revokeObjectURL(url);
+                    recordedChunks = [];
+                    preview.srcObject = null;
+                };
+
+                // If the user clicks Chrome's built-in "Stop Sharing" button at the bottom of their screen
+                stream.getVideoTracks()[0].onended = () => {
+                    stopRecording();
+                };
+
+                mediaRecorder.start();
+                
+                // Update buttons
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+
+            } catch (err) {
+                console.error("Error: " + err);
+                alert("Permission was denied or an error occurred.");
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopRecording();
+        });
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (stream) {
+                // Stop all video and audio tracks to turn off the recording indicator
+                stream.getTracks().forEach(track => track.stop());
+            }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>
